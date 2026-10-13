@@ -1,8 +1,8 @@
 # Ansible Workspace
 
 Рабочая база для inventory, playbooks и устанавливаемых ролей Galaxy.
-Все команды ниже выполняются из `ansible-workspace/`. Самостоятельная исходная
-роль находится в соседнем `../firewall/`; установленная копия — в `roles/firewall/`.
+Все команды ниже выполняются из `ansible-workspace/`. Роль `firewall` ставится
+из своего репозитория в `roles/firewall/`.
 
 ```text
 ansible.cfg
@@ -32,20 +32,18 @@ export ANSIBLE_CONFIG=./ansible.cfg
 python3 -m venv .venv
 . .venv/bin/activate
 python3 -m pip install -r requirements.txt
-mkdir -p .ansible
-tar --exclude='./.ansible' --exclude='./.venv' --exclude='./.git' --exclude='./__pycache__' -czf .ansible/firewall.tar.gz -C ../firewall .
-ansible-galaxy install -r requirements.yml -p ./roles
+ansible-galaxy role install -r requirements.yml -p ./roles
 ```
 
-`requirements.yml` устанавливает `firewall` из локального архива соседней роли.
-После изменения исходников пересоздайте архив и выполните
-`ansible-galaxy role install -r requirements.yml -p ./roles --force`.
+`requirements.yml` устанавливает `firewall` из Git-репозитория
+<https://github.com/r4ven-ansible/firewall> с закреплённым тегом релиза
+(`version: v1.0.0`). Эквивалент одной командой:
+`ansible-galaxy role install git+https://github.com/r4ven-ansible/firewall.git,v1.0.0 -p ./roles`.
+Чтобы перейти на другую версию, измените `version` и выполните установку с `--force`.
 `ANSIBLE_CONFIG` явно выбирает настройки workspace, даже если в окружении
 ранее был указан другой конфигурационный файл.
 Установленные роли игнорируются Git; в `roles/` отслеживается только `.gitkeep`.
 Коллекции пока не требуются: роль использует `ansible.builtin`.
-После публикации замените `src` на Git URL, добавьте `scm: git` и
-`version` с закреплённым тегом релиза.
 
 ## Запуск
 

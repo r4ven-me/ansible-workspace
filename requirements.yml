@@ -1,6 +1,7 @@
 ---
-# Build the archive from ../firewall before installing (see README.md).
 roles:
   - name: firewall
-    src: ./.ansible/firewall.tar.gz
+    src: https://github.com/r4ven-ansible/firewall.git
+    scm: git
+    version: v1.0.0
 collections: []
