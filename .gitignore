@@ -1,0 +1,15 @@
+.venv/
+.ansible/
+__pycache__/
+*.py[cod]
+*.retry
+.pytest_cache/
+.cache/
+tmp/
+.env
+.pass
+.vault-pass*
+inventory/local/
+/roles/*
+!/roles/.gitkeep
+/collections/

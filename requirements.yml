@@ -1,0 +1,6 @@
+---
+# Build the archive from ../firewall before installing (see README.md).
+roles:
+  - name: firewall
+    src: ./.ansible/firewall.tar.gz
+collections: []
