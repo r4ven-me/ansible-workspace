@@ -42,6 +42,13 @@ nft_sets:
     flags: interval
     elements: "{{ nft_trusted_ips }}"
 
+  - family: inet
+    table: filter
+    name: trusted6
+    type: ipv6_addr
+    flags: interval
+    elements: "{{ nft_trusted_ips6 }}"
+
   # per-source SSH rate limiting
   - family: inet
     table: filter
@@ -73,6 +80,9 @@ nft_lan6_networks:
 
 nft_trusted_ips:
   - 203.0.113.10
+
+# No IPv6 source is trusted until explicitly added.
+nft_trusted_ips6: []
 
 
 # CHAINS
@@ -301,6 +311,18 @@ nft_rules:
           value: "@trusted"
     action: accept
     comment: "Allow trusted IPs"
+
+  allow_trusted6:
+    order: 41
+    family: inet
+    table: filter
+    chain: input
+    match:
+      ip6:
+        saddr:
+          value: "@trusted6"
+    action: accept
+    comment: "Allow trusted IPv6 addresses"
 
   icmp4:
     order: 50
