@@ -11,7 +11,7 @@ requirements.yml
 inventory/
   hosts.yml
   group_vars/all/firewall.yml
-  host_vars/firewall_example.yml
+  host_vars/crow.r4ven.me.yml
 playbooks/firewall.yml
 roles/firewall/
   defaults/
@@ -55,8 +55,8 @@ ansible-galaxy role install -r requirements.yml -p ./roles
 ```sh
 ansible-inventory --graph
 ansible-playbook playbooks/firewall.yml --syntax-check
-ansible-playbook playbooks/firewall.yml -l firewall_example --check --diff
-ansible-playbook playbooks/firewall.yml -l firewall_example
+ansible-playbook playbooks/firewall.yml -l crow.r4ven.me --check --diff
+ansible-playbook playbooks/firewall.yml -l crow.r4ven.me
 ```
 
 Если sudo требует пароль, добавьте `--ask-become-pass`. Проверка SSH host key
