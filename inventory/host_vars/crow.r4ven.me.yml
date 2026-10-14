@@ -11,3 +11,33 @@ nft_allowed_ports:
 # For a private WAN, review the spoof guards and LAN/WAN classification.
 # See README.md before disabling protection or enabling this host.
 nft_rules_extra: {}
+
+# Inactive host override examples; review management access before enabling.
+# Requires a role version supporting nft_rules_host; see workspace README.md.
+# Addresses in 203.0.113.0/24 are documentation placeholders.
+# nft_rules_host:
+#   # Add: allow node_exporter only from the Prometheus IPv4 source.
+#   wan_allow_prometheus:
+#     order: 120
+#     family: inet
+#     table: filter
+#     chain: input_wan
+#     match:
+#       ip:
+#         saddr: 203.0.113.20
+#       meta:
+#         l4proto: tcp
+#       tcp:
+#         dport: 9100
+#     action: accept
+#     comment: "Allow node_exporter from Prometheus"
+#
+#   # Remove: disables this WAN SSH accept, not trusted/LAN/established access.
+#   # Enable only after verifying an alternative management path.
+#   wan_allow_ssh: null
+#
+#   # Modify: recursive merge preserves all other IPv4 SSH flood rule fields.
+#   # Independent example: affects accepted WAN SSH only if wan_allow_ssh remains.
+#   wan_ssh_flood_ipv4:
+#     match:
+#       raw: 'add @ssh_flood4 { ip saddr limit rate over 10/minute }'

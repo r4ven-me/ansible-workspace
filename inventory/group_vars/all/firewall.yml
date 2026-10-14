@@ -87,6 +87,8 @@ nft_chains:
     priority: -1
     policy: drop
 
+  # Intentionally permissive: new routed traffic is accepted unless explicitly
+  # dropped here. Input rules do not protect forwarded/container traffic.
   - family: inet
     table: filter
     name: forward
@@ -147,6 +149,63 @@ nft_chains:
 nft_rules:
 
   # ---- BASE ----
+  allow_dhcp_client6:
+    order: 7
+    family: inet
+    table: filter
+    chain: input
+    match:
+      iifname: "{{ nft_wan_interface }}"
+      meta:
+        l4proto: udp
+      ip6:
+        saddr: "fe80::/10"
+      udp:
+        sport: 547
+        dport: 546
+    action: accept
+    comment: "Allow DHCPv6 client replies"
+
+  # The guards run after allow_established, so a forged ICMP error carrying a
+  # live flow's tuple would be accepted as 'related'. Redirects are the one such
+  # message with real consequences (route injection, MITM), and no server needs
+  # to honour them; pair this with accept_redirects=0 in sysctl.
+  allow_dhcp_client4:
+    order: 6
+    family: inet
+    table: filter
+    chain: input
+    match:
+      iifname: "{{ nft_wan_interface }}"
+      meta:
+        l4proto: udp
+      udp:
+        sport: 67
+        dport: 68
+    action: accept
+    comment: "Allow DHCPv4 client replies"
+
+  allow_icmp6_nd:
+    order: 5
+    family: inet
+    table: filter
+    chain: input
+    match:
+      meta:
+        l4proto: ipv6-icmp
+      icmpv6:
+        type:
+          - nd-router-solicit
+          - nd-router-advert
+          - nd-neighbor-solicit
+          - nd-neighbor-advert
+    action: accept
+    comment: "Allow IPv6 neighbour discovery"
+
+  # A DHCP-addressed host loses its lease without these: a unicast renew reply
+  # from a private server is dropped by the guard before allow_established, and
+  # broadcast rebind replies match no conntrack entry at all. Bound to the WAN
+  # interface; a host that leases on another interface needs its own rule.
   drop_invalid:
     order: 10
     family: inet
@@ -158,11 +217,50 @@ nft_rules:
     action: drop
     comment: "Drop invalid connections"
 
-  # ---- WAN SPOOFING GUARD ----
-  # must run before allow_established so spoofed packets cannot
-  # piggyback on existing conntrack entries
-  drop_wan_spoofed_lan_ipv4:
+  drop_icmp_redirect4:
+    order: 11
+    family: inet
+    table: filter
+    chain: input
+    match:
+      meta:
+        l4proto: icmp
+      icmp:
+        type: redirect
+    action: drop
+    comment: "Drop ICMP redirects"
+
+  drop_icmp_redirect6:
     order: 12
+    family: inet
+    table: filter
+    chain: input
+    match:
+      meta:
+        l4proto: ipv6-icmp
+      icmpv6:
+        type: nd-redirect
+    action: drop
+    comment: "Drop ICMPv6 redirects"
+
+  allow_established:
+    order: 15
+    family: inet
+    table: filter
+    chain: input
+    match:
+      ct:
+        state:
+          - established
+          - related
+    action: accept
+    comment: "Allow established connections"
+
+  # ---- WAN SPOOFING GUARD ----
+  # Run after established/related so replies from private uplink peers survive.
+  # New/untracked private-source traffic on WAN still reaches these guards.
+  drop_wan_spoofed_lan_ipv4:
+    order: 20
     family: inet
     table: filter
     chain: input
@@ -172,7 +270,7 @@ nft_rules:
     comment: "Drop spoofed private IPv4 from WAN"
 
   drop_wan_spoofed_lan_ipv6:
-    order: 13
+    order: 21
     family: inet
     table: filter
     chain: input
@@ -181,16 +279,6 @@ nft_rules:
       jump: log_drop
     comment: "Drop spoofed private IPv6 from WAN"
 
-  allow_established:
-    order: 20
-    family: inet
-    table: filter
-    chain: input
-    match:
-      ct:
-        state: [established, related]
-    action: accept
-    comment: "Allow established connections"
 
   allow_loopback:
     order: 30
@@ -223,7 +311,10 @@ nft_rules:
       meta:
         l4proto: icmp
       icmp:
-        type: [echo-request, destination-unreachable, time-exceeded]
+        type:
+          - echo-request
+          - destination-unreachable
+          - time-exceeded
       limit:
         rate: "10/second"
     action: accept
@@ -392,7 +483,9 @@ nft_rules:
   #   chain: input_wan
   #   match:
   #     tcp:
-  #       dport: [80, 443]
+  #       dport:
+  #         - 80
+  #         - 443
   #   action: accept
 
   # wan_allow_dns_ntp:
@@ -402,7 +495,9 @@ nft_rules:
   #   chain: input_wan
   #   match:
   #     udp:
-  #       dport: [53, 123]
+  #       dport:
+  #         - 53
+  #         - 123
   #   action: accept
 
   wan_default_drop:
@@ -437,9 +532,22 @@ nft_rules:
     action: drop
     comment: "Drop invalid forwarded connections"
 
-  # spoofing guard must run before fwd_allow_established
+  fwd_allow_established:
+    order: 203
+    family: inet
+    table: filter
+    chain: forward
+    match:
+      ct:
+        state:
+          - established
+          - related
+    action: accept
+    comment: "Allow established forwarded connections"
+
+  # As in input, accept established/related before checking private WAN sources.
   fwd_drop_wan_spoofed_lan_ipv4:
-    order: 201
+    order: 205
     family: inet
     table: filter
     chain: forward
@@ -449,7 +557,7 @@ nft_rules:
     comment: "Drop spoofed private IPv4 forwarded from WAN"
 
   fwd_drop_wan_spoofed_lan_ipv6:
-    order: 202
+    order: 206
     family: inet
     table: filter
     chain: forward
@@ -458,16 +566,6 @@ nft_rules:
       jump: log_drop
     comment: "Drop spoofed private IPv6 forwarded from WAN"
 
-  fwd_allow_established:
-    order: 205
-    family: inet
-    table: filter
-    chain: forward
-    match:
-      ct:
-        state: [established, related]
-    action: accept
-    comment: "Allow established forwarded connections"
 
   # # Vritual interfaces
 
